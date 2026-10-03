@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "id": "auto-sell",
+  "version": "${version}",
+  "name": "Auto Sell",
+  "description": "Press G to toggle sending /sellall totem_of_undying every second.",
+  "authors": ["Auto Sell"],
+  "license": "MIT",
+  "environment": "client",
+  "entrypoints": {
+    "client": ["dev.autosell.AutoSell"]
+  },
+  "depends": {
+    "fabricloader": ">=0.18.0",
+    "minecraft": "~1.21.11",
+    "java": ">=21",
+    "fabric-api": "*"
+  }
+}
