@@ -11,11 +11,16 @@ import net.minecraft.class_332;
 import net.minecraft.class_9779;
 import org.lwjgl.glfw.GLFW;
 
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
+
 /**
  * Press G (with no screen open) to toggle the cycle:
  * wait 5 min -> /home 1 -> wait 6 s -> /sellall x10 (1 s apart) -> /home 3 -> repeat.
  * While on, the sneak key is held down. A small HUD panel shows the cycle count,
- * current status and time until the next cycle.
+ * current status and time until the next cycle, and a red pulsing panel appears
+ * whenever another player is within 100 blocks.
  */
 public class AutoSell implements ClientModInitializer {
     // commands are sent without the leading slash
@@ -29,7 +34,12 @@ public class AutoSell implements ClientModInitializer {
     private static final int SELL_INTERVAL_TICKS = TPS;   // 1 second between sells
     private static final int SELL_COUNT = 10;
 
+    private static final double ALERT_RADIUS = 100.0;     // blocks
+    private static final int MAX_LISTED = 5;              // players listed in the alert panel
+
     private enum State { IDLE, ARRIVING, SELLING, RETURNING }
+
+    private record Nearby(class_2561 name, int distance) {}
 
     private static boolean enabled = false;
     private static boolean lastKeyDown = false;
@@ -37,6 +47,7 @@ public class AutoSell implements ClientModInitializer {
     private static int ticks = 0;
     private static int sells = 0;
     private static int cycles = 0; // fully finished cycles since toggled on
+    private static List<Nearby> nearby = new ArrayList<>();
 
     @Override
     public void onInitializeClient() {
@@ -60,10 +71,25 @@ public class AutoSell implements ClientModInitializer {
         state = State.IDLE;
         ticks = 0;
         sells = 0;
+        nearby = new ArrayList<>();
     }
 
     private static void send(class_310 mc, String command) {
         mc.method_1562().method_45730(command);
+    }
+
+    /** Collects other players within ALERT_RADIUS, closest first. */
+    private static void scanPlayers(class_310 mc) {
+        List<Nearby> found = new ArrayList<>();
+        if (mc.field_1687 != null && mc.field_1724 != null) {
+            for (var p : mc.field_1687.method_18456()) {
+                if (p == mc.field_1724) continue;
+                float d = mc.field_1724.method_5739(p);
+                if (d <= ALERT_RADIUS) found.add(new Nearby(p.method_5477(), Math.round(d)));
+            }
+        }
+        found.sort(Comparator.comparingInt(Nearby::distance));
+        nearby = found;
     }
 
     private static void tick(class_310 mc) {
@@ -87,6 +113,8 @@ public class AutoSell implements ClientModInitializer {
             releaseSneak(mc);
             return;
         }
+
+        scanPlayers(mc);
 
         ticks++;
         switch (state) {
@@ -183,6 +211,53 @@ public class AutoSell implements ClientModInitializer {
             ctx.method_51433(tr, keys[i], x + pad, ry, 0xFF8D93A8, false);
             ctx.method_51433(tr, values[i], x + width - pad - tr.method_1727(values[i]), ry, 0xFFE6E8EF, false);
             ry += row;
+        }
+
+        renderAlert(ctx, tr, x, y + height + 6, pad, row, headerH);
+    }
+
+    /** Red pulsing panel listing nearby players; only drawn while someone is in range. */
+    private static void renderAlert(class_332 ctx, class_327 tr, int x, int y, int pad, int row, int headerH) {
+        List<Nearby> list = nearby;
+        if (list.isEmpty()) return;
+
+        int shown = Math.min(list.size(), MAX_LISTED);
+        int extra = list.size() - shown;
+        String title = "PLAYER NEARBY";
+        String moreText = "+" + extra + " more";
+
+        int width = tr.method_1727(title) + pad * 2;
+        for (int i = 0; i < shown; i++) {
+            Nearby n = list.get(i);
+            width = Math.max(width, tr.method_27525(n.name()) + 14 + tr.method_1727(n.distance() + "m") + pad * 2);
+        }
+        width = Math.max(width, 120);
+        int rows = shown + (extra > 0 ? 1 : 0);
+        int height = headerH + rows * row + pad;
+
+        float pulse = 0.5f + 0.5f * (float) Math.sin(System.currentTimeMillis() / 150.0);
+        int outlineAlpha = 0x80 + (int) (0x7F * pulse);
+        int red = 0xFF4040;
+
+        ctx.method_25294(x - 1, y - 1, x + width + 1, y + height + 1, (outlineAlpha << 24) | red); // pulsing outline
+        ctx.method_25294(x, y, x + width, y + height, 0xD9200C0C);                                   // body
+        ctx.method_25294(x, y, x + width, y + headerH, 0xF0140808);                                  // header
+        ctx.method_25294(x, y, x + width, y + 1, 0xFFFF4040);                                        // top line
+        ctx.method_25294(x + 3, y + headerH, x + width - 3, y + headerH + 1, 0xFFFF4040);            // separator
+
+        int titleColor = (0xC0 + (int) (0x3F * pulse)) << 24 | 0xFF5555;
+        ctx.method_51433(tr, title, x + (width - tr.method_1727(title)) / 2, y + 4, titleColor, false);
+
+        int ry = y + headerH + 3;
+        for (int i = 0; i < shown; i++) {
+            Nearby n = list.get(i);
+            String dist = n.distance() + "m";
+            ctx.method_51439(tr, n.name(), x + pad, ry, 0xFFE6E8EF, false);
+            ctx.method_51433(tr, dist, x + width - pad - tr.method_1727(dist), ry, 0xFFFF8080, false);
+            ry += row;
+        }
+        if (extra > 0) {
+            ctx.method_51433(tr, moreText, x + pad, ry, 0xFF8D93A8, false);
         }
     }
 }
