@@ -14,7 +14,8 @@ import org.lwjgl.glfw.GLFW;
 /**
  * Press G (with no screen open) to toggle the cycle:
  * wait 5 min -> /home 1 -> wait 6 s -> /sellall x10 (1 s apart) -> /home 3 -> repeat.
- * A small HUD panel shows the cycle count, current status and time until the next cycle.
+ * While on, the sneak key is held down. A small HUD panel shows the cycle count,
+ * current status and time until the next cycle.
  */
 public class AutoSell implements ClientModInitializer {
     // commands are sent without the leading slash
@@ -39,8 +40,20 @@ public class AutoSell implements ClientModInitializer {
 
     @Override
     public void onInitializeClient() {
+        // sneak is applied at the START of the tick so the player's input sees it this tick
+        ClientTickEvents.START_CLIENT_TICK.register(AutoSell::holdSneak);
         ClientTickEvents.END_CLIENT_TICK.register(AutoSell::tick);
         HudElementRegistry.addLast(class_2960.method_60655("auto-sell", "timer"), AutoSell::renderHud);
+    }
+
+    private static void holdSneak(class_310 mc) {
+        if (enabled && mc.field_1724 != null) {
+            mc.field_1690.field_1832.method_23481(true);
+        }
+    }
+
+    private static void releaseSneak(class_310 mc) {
+        mc.field_1690.field_1832.method_23481(false);
     }
 
     private static void reset() {
@@ -61,6 +74,7 @@ public class AutoSell implements ClientModInitializer {
             enabled = !enabled;
             reset();
             cycles = 0;
+            if (!enabled) releaseSneak(mc);
             mc.field_1724.method_7353(class_2561.method_43470(
                     enabled ? "Auto Sell: ON (first run in 5:00)" : "Auto Sell: OFF"), true);
         }
@@ -70,6 +84,7 @@ public class AutoSell implements ClientModInitializer {
         if (mc.field_1724 == null || mc.method_1562() == null) {
             enabled = false; // left the world
             reset();
+            releaseSneak(mc);
             return;
         }
 
