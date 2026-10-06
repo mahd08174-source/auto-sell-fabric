@@ -17,7 +17,7 @@ import java.util.List;
 
 /**
  * Press G (with no screen open) to toggle the cycle:
- * wait 5 min -> /home 1 -> wait 6 s -> /sellall x10 (1 s apart) -> /home 3 -> repeat.
+ * wait 5 min -> /home 1 -> wait 6 s -> /sellall x30 (0.5 s apart) -> /home 3 -> repeat.
  * While on, the sneak key is held down. A small HUD panel shows the cycle count,
  * current status and time until the next cycle, and a red pulsing panel appears
  * whenever another player is within 100 blocks.
@@ -31,8 +31,8 @@ public class AutoSell implements ClientModInitializer {
     private static final int TPS = 20;
     private static final int IDLE_TICKS = 5 * 60 * TPS;   // 5 minutes at home 3 between runs
     private static final int ARRIVE_TICKS = 6 * TPS;      // wait after /home 1
-    private static final int SELL_INTERVAL_TICKS = TPS;   // 1 second between sells
-    private static final int SELL_COUNT = 10;
+    private static final int SELL_INTERVAL_TICKS = TPS / 2; // 0.5 seconds between sells
+    private static final int SELL_COUNT = 30;
 
     private static final double ALERT_RADIUS = 100.0;     // blocks
     private static final int MAX_LISTED = 5;              // players listed in the alert panel
